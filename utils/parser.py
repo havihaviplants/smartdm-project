@@ -77,3 +77,11 @@ def parse_doc():
 
 def parse_question(text: str) -> str:
     return text.strip() if text else "Empty question"
+
+def get_manual_text():
+    manual_path = os.getenv("MANUAL_PATH", "data/manual.txt")
+    if not os.path.exists(manual_path):
+        print(f"[WARN] 매뉴얼 경로 없음: {manual_path}")
+        return "상담 매뉴얼을 찾을 수 없습니다."
+    with open(manual_path, "r", encoding="utf-8") as f:
+        return f.read()
