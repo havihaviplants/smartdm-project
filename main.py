@@ -2,21 +2,21 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from openai import OpenAI
-from utils.parser import parse_question, get_manual_text
+import openai
 import os
+from utils.parser import parse_question, get_manual_text, get_sheet_info
 
 # 🔐 환경 변수 로드
 load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY")
+GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 
-if not openai_api_key:
-    raise RuntimeError("[환경설정 오류] OPENAI_API_KEY가 .env에 정의되어 있지 않습니다.")
+if not openai.api_key:
+    raise RuntimeError("❌ OPENAI_API_KEY가 설정되어 있지 않습니다.")
+if not GOOGLE_SHEET_ID:
+    raise RuntimeError("❌ GOOGLE_SHEET_ID가 설정되어 있지 않습니다.")
 
-# 🤖 OpenAI 클라이언트 초기화
-client: OpenAI = OpenAI(api_key=openai_api_key)
-
-# 🌐 FastAPI 인스턴스 생성
+# 🌐 FastAPI 앱
 app = FastAPI()
 
 # ✅ CORS 설정
@@ -28,31 +28,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📥 요청 모델 정의
+# 📥 요청 모델
 class Question(BaseModel):
     question: str
     use_gpt4: bool = False
 
-# 🏠 기본 루트
 @app.get("/")
 async def root():
     return {"message": "Smart Parser API is running."}
 
-# 🧪 매뉴얼 확인용 테스트 엔드포인트
 @app.get("/test-manual")
 async def test_manual():
     try:
-        manual = get_manual_text()
-        return {"manual": manual[:300]}
+        return {"manual": get_manual_text()[:300]}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"❌ 매뉴얼 로딩 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"매뉴얼 로딩 실패: {e}")
 
-# 📦 매뉴얼 기반 응답 처리
 @app.post("/ask")
 async def ask_question(payload: Question):
     try:
         parsed = parse_question(payload.question)
         manual = get_manual_text()
+        sheet_summary = get_sheet_info(GOOGLE_SHEET_ID)
 
         if not manual or "상담 매뉴얼을 찾을 수 없습니다." in manual:
             return {
@@ -61,33 +58,34 @@ async def ask_question(payload: Question):
                 "parsed": parsed
             }
 
-        prompt = (
-            f"다음은 상담 매뉴얼입니다. 납기일, 마감일, 응대 기준 등의 정보가 포함되어 있습니다:\n\n"
-            f"{manual}\n\n"
-            f"위 매뉴얼을 바탕으로 아래 질문에 명확하고 친절하게 답변해 주세요.\n\n"
-            f"질문: {payload.question}"
-        )
+        prompt = f"""
+아래는 상담을 위한 매뉴얼과 참고용 시트 정보입니다.
 
-        model_name = "gpt-4" if payload.use_gpt4 else "gpt-3.5-turbo"
+📘 상담 매뉴얼:
+{manual}
 
-        response = client.chat.completions.create(
-            model=model_name,
+📊 참고용 시트 요약:
+{sheet_summary}
+
+이 자료들을 바탕으로 다음 질문에 대해 정확하고 친절하게 응답해 주세요.
+질문: {payload.question}
+"""
+
+        model = "gpt-4" if payload.use_gpt4 else "gpt-3.5-turbo"
+
+        response = openai.ChatCompletion.create(
+            model=model,
             messages=[
-                {
-                    "role": "system",
-                    "content": "너는 상담 매뉴얼을 기준으로 정확하고 친절하게 답하는 스마트한 상담 도우미야."
-                },
+                {"role": "system", "content": "너는 매뉴얼과 시트 데이터를 참고해 정확하게 응답하는 스마트 상담 도우미야."},
                 {"role": "user", "content": prompt}
             ]
         )
 
-        answer = response.choices[0].message.content.strip()
-
         return {
-            "answer": answer,
-            "model": model_name,
+            "answer": response.choices[0].message.content.strip(),
+            "model": model,
             "parsed": parsed
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"❌ GPT 응답 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"GPT 응답 실패: {e}")
