@@ -8,6 +8,7 @@ from parser import parse_doc
 from parser import parse_sheet
 from parser import get_manual_text
 from refiner import refine_question
+from utils import parser  # parser 모듈 전체 import
 
 
 from utils.parser import parse_question  # ✅ 질문 파서 import
@@ -117,3 +118,11 @@ async def parse_data(req: ParseRequest):
             raise HTTPException(status_code=400, detail="지원하지 않는 소스입니다.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파싱 중 오류 발생: {e}")
+
+@app.get("/parse-sheet")
+def get_sheet_data():
+    return {"sheet": parser.parse_sheet()}
+
+@app.get("/parse-doc")
+def get_doc_data():
+    return {"doc": parser.parse_doc()}
