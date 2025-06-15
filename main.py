@@ -8,8 +8,6 @@ from parser import parse_doc
 from parser import parse_sheet
 from parser import get_manual_text
 from refiner import refine_question
-from utils import parser  # parser 모듈 전체 import
-
 
 from utils.parser import parse_question  # ✅ 질문 파서 import
 
@@ -21,14 +19,6 @@ app = FastAPI()
 class Question(BaseModel):
     question: str
 
-@app.post("/ask")
-def ask_question(q: Question):
-    try:
-        manual = get_manual_text()
-        refined_answer = refine_question(manual, q.question)
-        return {"answer": refined_answer}
-    except Exception as e:
-        return {"error": str(e)}
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,12 +59,13 @@ async def root():
 @app.post("/ask")
 async def ask_question(payload: Question):
     try:
-        # ✅ 자연어 질문 파싱
+        # ✅ 질문 파싱
         parsed = parse_question(payload.question)
-        print("🤖 질문 파싱 결과:", parsed)
 
-        # 현재는 여전히 GPT로 처리하되, intent 따라 분기도 가능
+        # ✅ 문맥 불러오기
         context = get_parsed_context()
+
+        # ✅ GPT 프롬프트 구성
         prompt = f"""
 다음은 사용자의 데이터입니다.
 
@@ -97,11 +88,12 @@ async def ask_question(payload: Question):
         return {
             "answer": response['choices'][0]['message']['content'],
             "model": model_name,
-            "parsed": parsed  # ✅ 클라이언트에서 intent 확인 가능
+            "parsed": parsed
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/ask-all")
 async def ask_all(payload: Question):
@@ -118,11 +110,3 @@ async def parse_data(req: ParseRequest):
             raise HTTPException(status_code=400, detail="지원하지 않는 소스입니다.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파싱 중 오류 발생: {e}")
-
-@app.get("/parse-sheet")
-def get_sheet_data():
-    return {"sheet": parser.parse_sheet()}
-
-@app.get("/parse-doc")
-def get_doc_data():
-    return {"doc": parser.parse_doc()}
