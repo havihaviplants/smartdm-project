@@ -2,19 +2,23 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import openai
+from openai import OpenAI
 import os
+
 from utils.parser import parse_question, get_manual_text, get_sheet_info
 
 # 🔐 환경 변수 로드
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 
-if not openai.api_key:
+if not OPENAI_API_KEY:
     raise RuntimeError("❌ OPENAI_API_KEY가 설정되어 있지 않습니다.")
 if not GOOGLE_SHEET_ID:
     raise RuntimeError("❌ GOOGLE_SHEET_ID가 설정되어 있지 않습니다.")
+
+# 🔗 OpenAI 클라이언트 초기화 (최신 SDK 방식)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 🌐 FastAPI 앱
 app = FastAPI()
@@ -43,6 +47,10 @@ async def test_manual():
         return {"manual": get_manual_text()[:300]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"매뉴얼 로딩 실패: {e}")
+
+@app.get("/debug-manual")
+def debug_manual():
+    return {"manual": get_manual_text()}
 
 @app.post("/ask")
 async def ask_question(payload: Question):
@@ -73,7 +81,7 @@ async def ask_question(payload: Question):
 
         model = "gpt-4" if payload.use_gpt4 else "gpt-3.5-turbo"
 
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": "너는 매뉴얼과 시트 데이터를 참고해 정확하게 응답하는 스마트 상담 도우미야."},
@@ -89,8 +97,3 @@ async def ask_question(payload: Question):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"GPT 응답 실패: {e}")
-
-@app.get("/debug-manual")
-def debug_manual():
-    from utils.parser import get_manual_text
-    return {"manual": get_manual_text()}
