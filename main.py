@@ -89,3 +89,8 @@ async def ask_question(payload: Question):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"GPT 응답 실패: {e}")
+
+@app.get("/debug-manual")
+def debug_manual():
+    from utils.parser import get_manual_text
+    return {"manual": get_manual_text()}
