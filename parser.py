@@ -1,11 +1,25 @@
-import json
 import os
+import json
 import gspread
+from typing import Dict
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from bs4 import BeautifulSoup
 
-# -------------------- 인증 --------------------
+# -------------------- 매뉴얼 불러오기 (JSON 기반) --------------------
+def get_manual_text() -> str:
+    """
+    manual.json을 불러와 텍스트로 변환 (GPT 입력용)
+    """
+    try:
+        manual_path = os.path.join(os.path.dirname(__file__), "manual.json")
+        with open(manual_path, "r", encoding="utf-8") as f:
+            manual_data: Dict[str, str] = json.load(f)
+        return "\n".join([f"{k}: {v}" for k, v in manual_data.items()])
+    except Exception as e:
+        return f"상담 매뉴얼을 찾을 수 없습니다. ({e})"
+
+# -------------------- 구글 시트 불러오기 --------------------
 def get_google_client():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name(
@@ -13,8 +27,10 @@ def get_google_client():
     )
     return gspread.authorize(creds)
 
-# -------------------- 시트 파싱 --------------------
-def parse_sheet():
+def get_sheet_info() -> str:
+    """
+    구글 시트 데이터를 요약된 텍스트로 파싱
+    """
     try:
         sheet_id = os.getenv("GOOGLE_SHEET_ID")
         client = get_google_client()
@@ -47,8 +63,11 @@ def parse_sheet():
     except Exception as e:
         return f"시트 파싱 실패: {e}"
 
-# -------------------- 문서 파싱 --------------------
-def parse_doc():
+# -------------------- 구글 문서 불러오기 --------------------
+def parse_doc() -> str:
+    """
+    구글 문서를 파싱하여 텍스트 추출
+    """
     try:
         doc_url = os.getenv("GOOGLE_DOC_URL")
         response = requests.get(doc_url)
@@ -71,31 +90,19 @@ def parse_doc():
             if any(text.lower().startswith(prefix) for prefix in ["참고", "비고", "추가"]):
                 continue
 
-            # 태그 구조 강조
             if tag.name in ['h1', 'h2', 'h3']:
                 lines.append(f"\n📌 {text}\n")
             elif tag.name == 'li':
-                if len(text) < 3:  # 너무 짧은 리스트 항목 제거
+                if len(text) < 3:
                     continue
                 lines.append(f"- {text}")
             elif tag.name == 'p':
-                if len(text.split()) < 3:  # 의미 없는 문장 제거
+                if len(text.split()) < 3:
                     continue
                 lines.append(text)
 
-        # 중복 제거 + 정제 출력
         unique_lines = list(dict.fromkeys(lines))  # 순서 보존 + 중복 제거
         return "\n".join(unique_lines).strip()
 
     except Exception as e:
         return f"문서 파싱 실패: {e}"
-    
-# parser.py
-
-def get_manual_text():
-    """refiner.py와 공유할 수 있도록 상담 매뉴얼 불러오기"""
-    manual_path = os.getenv("MANUAL_PATH", "data/manual.txt")
-    if not os.path.exists(manual_path):
-        return "상담 매뉴얼을 찾을 수 없습니다."
-    with open(manual_path, "r", encoding="utf-8") as f:
-        return f.read()
