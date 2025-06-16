@@ -15,10 +15,7 @@ def get_manual_text() -> str:
         manual_path = os.path.join(os.path.dirname(__file__), "manual.json")
         with open(manual_path, "r", encoding="utf-8") as f:
             manual_data: Dict[str, str] = json.load(f)
-        if isinstance(manual_data, dict):
-            return "\n".join([f"{k}: {v}" for k, v in manual_data.items()])
-        else:
-            return "manual.json 파일 구조가 딕셔너리가 아닙니다."
+        return "\n".join([f"{k}: {v}" for k, v in manual_data.items()])
     except Exception as e:
         return f"상담 매뉴얼을 찾을 수 없습니다. ({e})"
 
