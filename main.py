@@ -2,8 +2,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import json
 import os
 import openai
+from fastapi import Query
+
 
 # 🔐 환경변수 로드
 load_dotenv()
@@ -21,7 +24,7 @@ openai.api_key = OPENAI_API_KEY
 # 🧠 유틸 함수 import
 from utils.parser import parse_question, get_manual_text, get_sheet_info
 
-# 🌐 앱 생성
+# 🌐 FastAPI 앱 객체 (여기만 사용)
 app = FastAPI(
     title="Smart Parser API",
     description="DM 및 상담용 AI 파서 API",
@@ -46,6 +49,21 @@ class Question(BaseModel):
 @app.get("/")
 async def root():
     return {"message": "Smart Parser API is running."}
+
+# 🔑 manual.json 파일 절대 경로 설정
+MANUAL_PATH = os.path.join(os.path.dirname(__file__), "utils", "manual.json")
+
+# 📘 상담 매뉴얼 전체 반환
+@app.get("/manual")
+def get_manual():
+    try:
+        with open(MANUAL_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {"manual": data}
+    except FileNotFoundError:
+        return {"error": "manual.json not found"}
+    except json.JSONDecodeError:
+        return {"error": "manual.json is not valid JSON"}
 
 # 🧪 매뉴얼 테스트용 엔드포인트
 @app.get("/test-manual")
@@ -108,5 +126,24 @@ async def ask_question(payload: Question):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"GPT 응답 실패: {e}")
 
+
+# 🔍 환경 체크 출력 (옵션, 터미널에서 확인용)
 print("🔑 OPENAI_API_KEY 존재 여부:", bool(OPENAI_API_KEY))
 print("📄 GOOGLE_SHEET_ID:", GOOGLE_SHEET_ID)
+
+@app.get("/parse-sheet")
+def parse_sheet(sheet_id: str = Query(...), cell_range: str = Query(...)):
+    # 👉 여긴 지금은 더미 데이터로 대체
+    dummy_data = [
+        {
+            "날짜": "2025-06-27",
+            "내용": "예시 내용입니다",
+            "태그": ["문의", "우선응답"]
+        },
+        {
+            "날짜": "2025-06-26",
+            "내용": "다른 항목입니다",
+            "태그": ["캠페인"]
+        }
+    ]
+    return dummy_data
