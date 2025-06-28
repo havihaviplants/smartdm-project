@@ -5,16 +5,36 @@ from typing import Dict
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from bs4 import BeautifulSoup
+from pathlib import Path
 
 # -------------------- 매뉴얼 불러오기 --------------------
+# 📁 utils/parser.py 안에서 교체
 def get_manual_text() -> str:
+    # ✅ 현재 파일 기준으로 절대 경로 구성
+    manual_path = Path(__file__).parent / "manual.json"
+    
+    if not manual_path.exists():
+        return "상담 매뉴얼을 찾을 수 없습니다."
+
     try:
-        manual_path = os.path.join(os.path.dirname(__file__), "manual.json")
-        with open(manual_path, "r", encoding="utf-8") as f:
-            manual_data: Dict[str, str] = json.load(f)
-        return "\n".join([f"{k}: {v}" for k, v in manual_data.items()])
+        with manual_path.open(encoding="utf-8") as f:
+            manual_data = json.load(f)
+
+        if isinstance(manual_data, list):
+            return "\n\n".join(
+                f"Q: {item.get('question', '')}\nA: {item.get('answer', '')}"
+                for item in manual_data
+            )
+        elif isinstance(manual_data, dict):
+            return "\n\n".join(
+                f"Q: {k}\nA: {v}" for k, v in manual_data.items()
+            )
+        else:
+            return "상담 매뉴얼 포맷 오류: list 또는 dict 형태여야 합니다."
+
     except Exception as e:
-        return f"상담 매뉴얼을 찾을 수 없습니다. ({e})"
+        return f"상담 매뉴얼 로딩 중 오류: {e}"
+
 
 # -------------------- 키워드 파싱 --------------------
 def parse_question(question: str) -> dict:
