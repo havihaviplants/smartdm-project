@@ -48,7 +48,7 @@ async def root():
     return {"message": "Smart Parser API is running."}
 
 # 📘 상담 매뉴얼 반환
-@app.get("/manual")
+@app.get("/api/manual")
 def get_manual():
     try:
         return {"manual": get_manual_text()}
