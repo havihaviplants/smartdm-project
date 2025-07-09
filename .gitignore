@@ -1,12 +1,1 @@
-# Python 관련 무시 파일
-__pycache__/
-*.py[cod]
-*.sqlite3
 .env
-
-# 민감 JSON
-service_account.json
-utils/manual.json
-
-# 기타
-*.log
