@@ -5,19 +5,28 @@ from typing import Dict
 from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from bs4 import BeautifulSoup
+from pathlib import Path
+
 
 # -------------------- 매뉴얼 불러오기 (JSON 기반) --------------------
 def get_manual_text() -> str:
-    """
-    manual.json을 불러와 텍스트로 변환 (GPT 입력용)
-    """
+    manual_path = Path("utils/manual.json")
+    if not manual_path.exists():
+        return "상담 매뉴얼을 찾을 수 없습니다."
+
     try:
-        manual_path = os.path.join(os.path.dirname(__file__), "manual.json")
-        with open(manual_path, "r", encoding="utf-8") as f:
-            manual_data: Dict[str, str] = json.load(f)
-        return "\n".join([f"{k}: {v}" for k, v in manual_data.items()])
+        with manual_path.open(encoding="utf-8") as f:
+            manual_data = json.load(f)
+
+        if isinstance(manual_data, list):
+            return "\n\n".join(f"Q: {item.get('Q', '')}\nA: {item.get('A', '')}" for item in manual_data)
+        elif isinstance(manual_data, dict):
+            return "\n\n".join(f"Q: {k}\nA: {v}" for k, v in manual_data.items())
+        else:
+            return "상담 매뉴얼 포맷 오류: list 또는 dict 형태여야 합니다."
+
     except Exception as e:
-        return f"상담 매뉴얼을 찾을 수 없습니다. ({e})"
+        return f"상담 매뉴얼 로딩 중 오류: {e}"
 
 # -------------------- 구글 시트 불러오기 --------------------
 def get_google_client():
